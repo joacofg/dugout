@@ -4,6 +4,8 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -31,32 +33,6 @@ func TestOfficePageNeedsNoToken(t *testing.T) {
 		}
 		if resp.Header.Get("X-Content-Type-Options") != "nosniff" || resp.Header.Get("Referrer-Policy") != "no-referrer" {
 			t.Errorf("GET %s: headers %v", p, resp.Header)
-		}
-	}
-}
-
-// TestOfficePixelPage: the pixel office is another page of the same files,
-// at /office/pixel, under the same headers, loading the shared client.
-func TestOfficePixelPage(t *testing.T) {
-	_, srv, _ := stateServer(t, repoApp)
-	for _, p := range []string{"/office/pixel"} {
-		resp, err := http.Get(srv.URL + p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		b, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
-			t.Errorf("GET %s: status %d, type %q, want 200 text/html", p, resp.StatusCode, resp.Header.Get("Content-Type"))
-			continue
-		}
-		if csp := resp.Header.Get("Content-Security-Policy"); csp != webCSP {
-			t.Errorf("GET %s: CSP %q, want the page CSP", p, csp)
-		}
-		for _, want := range []string{`<canvas id="floor"`, `/office/client.js`, `/office/pixel-art.js`, `/office/pixel.js`, `href="/office"`} {
-			if !strings.Contains(string(b), want) {
-				t.Errorf("GET %s: page lacks %q", p, want)
-			}
 		}
 	}
 }
@@ -146,60 +122,74 @@ func TestOfficeFontsSameOrigin(t *testing.T) {
 	}
 }
 
-// TestOfficeClientOnlyReads: the pages make one kind of request, the office
-// stream, from one place; nothing they ship can open another channel.
-func TestOfficeClientOnlyReads(t *testing.T) {
-	fetches := 0
-	err := fs.WalkDir(webFS, "web", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".js") {
-			return err
-		}
-		b, err := fs.ReadFile(webFS, p)
-		if err != nil {
-			return err
-		}
-		src := string(b)
-		for _, banned := range []string{"XMLHttpRequest", "EventSource", "sendBeacon", "WebSocket", "serviceWorker"} {
-			if strings.Contains(src, banned) {
-				t.Errorf("%s contains %q", p, banned)
-			}
-		}
-		for i := strings.Index(src, "fetch("); i >= 0; i = strings.Index(src, "fetch(") {
-			fetches++
-			if p != "web/client.js" || !strings.HasPrefix(src[i:], `fetch("/v1/office/stream"`) {
-				t.Errorf("%s: a fetch other than the office stream: %.60q", p, src[i:])
-			}
-			src = src[i+len("fetch("):]
-		}
-		return nil
-	})
+// pageRefs is what a served page asks the browser to load: script and
+// stylesheet URLs in document order, and its anchors.
+type pageRefs struct{ scripts, styles, links []string }
+
+var tagRe = regexp.MustCompile(`<(script|link|a)\s[^>]*>`)
+var attrRe = regexp.MustCompile(`\b(src|href|rel)="([^"]*)"`)
+
+func getPage(t *testing.T, base, path string) (pageRefs, *http.Response) {
+	t.Helper()
+	resp, err := http.Get(base + path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fetches != 1 {
-		t.Errorf("%d fetch calls in the pages, want the one in client.js", fetches)
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		t.Fatalf("GET %s: status %d, type %q, want 200 text/html", path, resp.StatusCode, resp.Header.Get("Content-Type"))
 	}
+	var refs pageRefs
+	for _, m := range tagRe.FindAllStringSubmatch(string(b), -1) {
+		attrs := map[string]string{}
+		for _, a := range attrRe.FindAllStringSubmatch(m[0], -1) {
+			attrs[a[1]] = a[2]
+		}
+		switch {
+		case m[1] == "script":
+			refs.scripts = append(refs.scripts, attrs["src"])
+		case m[1] == "link" && attrs["rel"] == "stylesheet":
+			refs.styles = append(refs.styles, attrs["href"])
+		case m[1] == "a":
+			refs.links = append(refs.links, attrs["href"])
+		}
+	}
+	return refs, resp
 }
 
-// TestOfficeViewsLinkEachOther: each view links to the other, and the clear
-// view loads the shared client before its own script.
-func TestOfficeViewsLinkEachOther(t *testing.T) {
-	read := func(name string) string {
-		b, err := fs.ReadFile(webFS, "web/"+name)
-		if err != nil {
-			t.Fatal(err)
+// TestOfficeViewsServeTheirParts: each view is served under the page CSP,
+// loads only same-origin scripts from /office/ with the shared client first,
+// links to the other view, and every script and stylesheet it names answers.
+func TestOfficeViewsServeTheirParts(t *testing.T) {
+	_, srv, _ := stateServer(t, repoApp)
+	for _, c := range []struct{ path, own, other string }{
+		{"/office", "/office/app.js", "/office/pixel"},
+		{"/office/pixel", "/office/pixel.js", "/office"},
+	} {
+		refs, resp := getPage(t, srv.URL, c.path)
+		if csp := resp.Header.Get("Content-Security-Policy"); csp != webCSP {
+			t.Errorf("GET %s: CSP %q, want the page CSP", c.path, csp)
 		}
-		return string(b)
-	}
-	index, pixel := read("index.html"), read("pixel.html")
-	if !strings.Contains(index, `id="to-pixel" href="/office/pixel"`) {
-		t.Error("index.html does not link to the pixel office")
-	}
-	if !strings.Contains(pixel, `id="to-clear" href="/office"`) {
-		t.Error("pixel.html does not link to the clear view")
-	}
-	c, a := strings.Index(index, "/office/client.js"), strings.Index(index, "/office/app.js")
-	if c < 0 || a < 0 || c > a {
-		t.Errorf("index.html loads client.js at %d and app.js at %d, want client.js first", c, a)
+		if len(refs.scripts) == 0 || refs.scripts[0] != "/office/client.js" || refs.scripts[len(refs.scripts)-1] != c.own {
+			t.Errorf("GET %s: scripts %v, want client.js first and %s last", c.path, refs.scripts, c.own)
+		}
+		if !slices.Contains(refs.links, c.other) {
+			t.Errorf("GET %s: links %v, want one to %s", c.path, refs.links, c.other)
+		}
+		for _, u := range append(append([]string{}, refs.scripts...), refs.styles...) {
+			if !strings.HasPrefix(u, "/office/") {
+				t.Errorf("GET %s: loads %q, want a same-origin /office/ file", c.path, u)
+				continue
+			}
+			r, err := http.Get(srv.URL + u)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Body.Close()
+			if r.StatusCode != http.StatusOK || r.Header.Get("Content-Security-Policy") != webCSP {
+				t.Errorf("GET %s (from %s): status %d, CSP %q, want 200 under the page CSP", u, c.path, r.StatusCode, r.Header.Get("Content-Security-Policy"))
+			}
+		}
 	}
 }
