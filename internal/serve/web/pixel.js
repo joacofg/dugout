@@ -35,7 +35,9 @@
   let view = null, repo = null, repoName = "", chosen = office.repoParam();
   let stale = false, failed = false;
   let desks = new Map(), looks = new Map(), focusedDesk = "";
-  const flights = [], bulbs = new Map();
+  // toned holds until when each changed desk's label keeps its tone, so a
+  // view that follows soon after does not wipe it.
+  const flights = [], bulbs = new Map(), toned = new Map();
   let frames = 0;
 
   // ---- small DOM helpers ------------------------------------------------------
@@ -139,7 +141,7 @@
 
   // ---- labels, the sign and the words ---------------------------------------------
 
-  function labels(toned) {
+  function labels() {
     const active = document.activeElement;
     const keep = active && active.classList && active.classList.contains("tag") ? active.dataset.ws : "";
     for (const el of scene.querySelectorAll(".tag")) el.remove();
@@ -167,7 +169,8 @@
       const drop = () => { if (focusedDesk === w.id) { focusedDesk = ""; redraw(); } };
       tag.addEventListener("focus", pick); tag.addEventListener("blur", drop);
       tag.addEventListener("mouseenter", pick); tag.addEventListener("mouseleave", drop);
-      if (toned.has(w.id)) { tag.classList.add("changed"); setTimeout(() => tag.classList.remove("changed"), TONE_MS); }
+      const left = (toned.get(w.id) || 0) - performance.now();
+      if (left > 0) { tag.classList.add("changed"); setTimeout(() => tag.classList.remove("changed"), left); }
       scene.append(tag);
     }
     if (keep) {
@@ -190,7 +193,7 @@
       first.append(h("b", null, "Waiting for a human: " + personOf(e.sides[0]) + " and " + personOf(e.sides[1])), " · ", h("span", "mono", e.paths.join(", ")));
       if (open.length > 1) first.append(" and " + (open.length - 1) + " more");
       sign.className = "finding esc";
-      sign.append(first, h("p", "line", e.reason || escalationBy(e)));
+      sign.append(first, h("p", "line why", e.reason || escalationBy(e)));
     } else if (repo.conflicts.length) {
       const first = line();
       first.append(h("b", null, count(repo.conflicts.length, "span") + " in conflict"), " ", h("span", "mono", [...new Set(repo.conflicts.map((c) => fileName(c.path)))].join(", ")));
@@ -262,8 +265,10 @@
     if (!prev) { flights.length = 0; bulbs.clear(); }
     people();
     layout();
+    if (!prev) toned.clear();
+    for (const id of [...d.intents, ...d.joined]) toned.set(id, now + TONE_MS);
     finding();
-    labels(new Set([...d.intents, ...d.joined]));
+    labels();
     fit();
     describe();
     announce(d);
@@ -394,9 +399,9 @@
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (repo && !failed) { layout(); finding(); labels(new Set()); fit(); redraw(); } }, 100);
+    resizeTimer = setTimeout(() => { if (repo && !failed) { layout(); finding(); labels(); fit(); redraw(); } }, 100);
   });
-  if (document.fonts) document.fonts.ready.then(() => { if (repo && !failed) { labels(new Set()); fit(); redraw(); } });
+  if (document.fonts) document.fonts.ready.then(() => { if (repo && !failed) { labels(); fit(); redraw(); } });
 
   // ---- the legend and the connection ----------------------------------------------------
 
