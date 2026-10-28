@@ -45,8 +45,11 @@ h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; over
 /* Scene */
 .scene { position: relative; margin: 0 auto; }
 .scene canvas { display: block; image-rendering: pixelated; border-radius: 8px; }
-.finding { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; max-width: 86%; margin: 0; padding: 12px 18px;
-  border-radius: 8px; font-size: 20px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; background: #f7f9f8; color: var(--muted); }
+/* The sign sits on the wall and grows with the scene, so it stays the first
+   read from the back of the room. */
+.finding { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; max-width: 86%; margin: 0;
+  padding: calc(var(--fs-sign, 20px) * 0.55) calc(var(--fs-sign, 20px) * 0.9);
+  border-radius: 8px; font-size: var(--fs-sign, 20px); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; background: #f7f9f8; color: var(--muted); }
 .finding[hidden] { display: none; }
 .finding .line { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .finding b { font-weight: 600; }
@@ -54,7 +57,9 @@ h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; over
 .finding.spans { background: var(--pill-neutral-bg); color: var(--text); }
 
 /* Desk labels */
-.tag { position: absolute; text-align: center; padding: 6px 8px; border-radius: 8px; transition: background-color 200ms ease-out; }
+/* A name tag in the floor's own colour, so a cord or a trail never runs
+   through its words. */
+.tag { position: absolute; text-align: center; padding: 6px 8px; border-radius: 8px; background: rgba(234, 220, 198, 0.94); transition: background-color 200ms ease-out; }
 .tag:hover, .tag:focus { z-index: 3; background: rgba(255, 255, 255, 0.96); }
 .tag.changed { background: rgba(230, 235, 232, 0.94); }
 .tag p { margin: 0; overflow-wrap: anywhere; }
@@ -65,7 +70,9 @@ h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; over
 .tag:hover .who, .tag:hover .branch, .tag:focus .who, .tag:focus .branch { white-space: normal; }
 .tag .meta { font-size: var(--fs-meta); color: var(--muted); margin-top: 2px; }
 .tag .muted { color: var(--muted); }
-.keeps { color: var(--positive); font-weight: 600; }
+/* A step darker than the clear view's positive: it sits on the floor-tinted
+   name tags, where #1e7b4f falls under 4.5:1. */
+.keeps { color: #17663f; font-weight: 600; }
 
 /* Legend */
 .legend { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; color: var(--muted); font-size: 16px; margin-top: 12px; }
@@ -81,9 +88,17 @@ h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; over
   .top { padding: 0 16px; gap: 10px; font-size: 14px; }
   .crumb { display: none; }
   .pick select { min-height: 44px; }
+  .view { display: inline-flex; align-items: center; min-height: 44px; }
   .sheet { margin: 0; border-radius: 0; border-width: 1px 0 0; padding: 16px; }
-  .finding { font-size: 16px; max-width: 94%; }
+  /* On a phone the sign leaves the wall for the top of the scene, where its
+     words can wrap. */
+  .scene { display: flex; flex-direction: column; }
+  .finding { position: static; order: -1; transform: none; max-width: none; margin-bottom: 8px; }
+  .finding .line { white-space: normal; }
   .legend { gap: 14px 20px; font-size: 14px; }
+}
+@media (max-width: 479px) {
+  .brand .name { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tag { transition: none; }
