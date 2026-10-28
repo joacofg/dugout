@@ -41,7 +41,9 @@ body { background: var(--ground); color: var(--text); font: 400 var(--fs-body)/1
 .crumb b { color: var(--text); font-weight: 500; }
 .pick { display: none; align-items: center; gap: 8px; }
 .pick select { font: inherit; color: var(--text); height: 32px; max-width: 46vw; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); padding: 0 8px; }
-.status { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.status { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; margin-left: auto; }
+.view { color: var(--accent); text-decoration: none; font-weight: 500; white-space: nowrap; }
+.view:hover { text-decoration: underline; text-underline-offset: 3px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status[data-state="live"] .dot { background: var(--positive); }
 .sheet { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); margin: 0 8px 8px 0; padding: var(--pad); min-width: 0; }

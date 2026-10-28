@@ -145,3 +145,61 @@ func TestOfficeFontsSameOrigin(t *testing.T) {
 		}
 	}
 }
+
+// TestOfficeClientOnlyReads: the pages make one kind of request, the office
+// stream, from one place; nothing they ship can open another channel.
+func TestOfficeClientOnlyReads(t *testing.T) {
+	fetches := 0
+	err := fs.WalkDir(webFS, "web", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".js") {
+			return err
+		}
+		b, err := fs.ReadFile(webFS, p)
+		if err != nil {
+			return err
+		}
+		src := string(b)
+		for _, banned := range []string{"XMLHttpRequest", "EventSource", "sendBeacon", "WebSocket", "serviceWorker"} {
+			if strings.Contains(src, banned) {
+				t.Errorf("%s contains %q", p, banned)
+			}
+		}
+		for i := strings.Index(src, "fetch("); i >= 0; i = strings.Index(src, "fetch(") {
+			fetches++
+			if p != "web/client.js" || !strings.HasPrefix(src[i:], `fetch("/v1/office/stream"`) {
+				t.Errorf("%s: a fetch other than the office stream: %.60q", p, src[i:])
+			}
+			src = src[i+len("fetch("):]
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fetches != 1 {
+		t.Errorf("%d fetch calls in the pages, want the one in client.js", fetches)
+	}
+}
+
+// TestOfficeViewsLinkEachOther: each view links to the other, and the clear
+// view loads the shared client before its own script.
+func TestOfficeViewsLinkEachOther(t *testing.T) {
+	read := func(name string) string {
+		b, err := fs.ReadFile(webFS, "web/"+name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	index, pixel := read("index.html"), read("pixel.html")
+	if !strings.Contains(index, `id="to-pixel" href="/office/pixel"`) {
+		t.Error("index.html does not link to the pixel office")
+	}
+	if !strings.Contains(pixel, `id="to-clear" href="/office"`) {
+		t.Error("pixel.html does not link to the clear view")
+	}
+	c, a := strings.Index(index, "/office/client.js"), strings.Index(index, "/office/app.js")
+	if c < 0 || a < 0 || c > a {
+		t.Errorf("index.html loads client.js at %d and app.js at %d, want client.js first", c, a)
+	}
+}
