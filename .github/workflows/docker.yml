@@ -1,0 +1,44 @@
+name: docker
+
+# `dugout serve` is deployed from deploy/ (docker compose builds the image on
+# the host). This only proves the Dockerfile still builds and the image starts,
+# and that the compose file still resolves. It pushes nothing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/**
+      - .dockerignore
+      - go.mod
+      - go.sum
+      - .github/workflows/docker.yml
+  pull_request:
+    paths:
+      - deploy/**
+      - .dockerignore
+      - go.mod
+      - go.sum
+      - .github/workflows/docker.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: build
+        run: docker build -f deploy/Dockerfile -t dugout:ci .
+      - name: image starts
+        run: docker run --rm dugout:ci version
+      - name: compose resolves
+        run: DUGOUT_HOST=dugout.example.test docker compose -f deploy/docker-compose.yml config --quiet

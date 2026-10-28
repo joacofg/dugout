@@ -1,0 +1,55 @@
+name: ci-macos
+
+# macOS minutes cost ten times a Linux minute on a private repo, so this runs
+# only for the code that behaves differently there (the hook's process lookup,
+# the Keychain, launchd, the install) and only the packages that cover it.
+# The rest is platform-neutral and ci.yml tests it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cmd/**
+      - internal/hook/**
+      - internal/keychain/**
+      - internal/launchd/**
+      - internal/secrets/**
+      - internal/statedir/**
+      - internal/gitscan/**
+      - go.mod
+      - go.sum
+      - .github/workflows/ci-macos.yml
+  pull_request:
+    paths:
+      - cmd/**
+      - internal/hook/**
+      - internal/keychain/**
+      - internal/launchd/**
+      - internal/secrets/**
+      - internal/statedir/**
+      - internal/gitscan/**
+      - go.mod
+      - go.sum
+      - .github/workflows/ci-macos.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - name: test
+        run: go test ./cmd/... ./internal/hook/... ./internal/keychain/... ./internal/launchd/... ./internal/secrets/... ./internal/statedir/... ./internal/gitscan/...

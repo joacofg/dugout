@@ -1,0 +1,39 @@
+#!/bin/sh
+# Entry point of the plugin's hooks and MCP server: runs the binary next to the
+# plugin, else the link `dugout install` leaves in the state dir (macOS's, then
+# Linux's: $XDG_STATE_HOME when it is absolute, else ~/.local/state), else
+# dugout from the PATH, passing its exit status through (exec). Only absolute
+# PATH entries count, so a `.` or a relative entry never runs a dugout that the
+# repo in the current directory ships. Without any, hooks fail open so a
+# session never breaks.
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -x "$CLAUDE_PLUGIN_ROOT/bin/dugout" ]; then
+  exec "$CLAUDE_PLUGIN_ROOT/bin/dugout" "$@"
+fi
+if [ -x "${HOME:-}/Library/Application Support/dugout/bin/dugout" ]; then
+  exec "$HOME/Library/Application Support/dugout/bin/dugout" "$@"
+fi
+case "${XDG_STATE_HOME:-}" in
+/*) if [ -x "$XDG_STATE_HOME/dugout/bin/dugout" ]; then exec "$XDG_STATE_HOME/dugout/bin/dugout" "$@"; fi ;;
+esac
+if [ -n "${HOME:-}" ] && [ -x "$HOME/.local/state/dugout/bin/dugout" ]; then
+  exec "$HOME/.local/state/dugout/bin/dugout" "$@"
+fi
+old_ifs=$IFS
+IFS=:
+for dir in ${PATH:-}; do
+  case "$dir" in
+  /*)
+    if [ -f "$dir/dugout" ] && [ -x "$dir/dugout" ]; then
+      IFS=$old_ifs
+      exec "$dir/dugout" "$@"
+    fi
+    ;;
+  esac
+done
+IFS=$old_ifs
+if [ "${1:-}" = "hook" ]; then
+  echo '{}'
+  exit 0
+fi
+echo 'dugout is not installed: see docs/install.md in github.com/joacofg/dugout' >&2
+exit 1

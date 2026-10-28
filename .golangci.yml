@@ -1,0 +1,42 @@
+version: "2"
+
+# The standard set (errcheck, govet, ineffassign, staticcheck, unused) and no
+# more. The baseline is what main passed when this was added: the rules below
+# only silence what we decided not to chase. See CONTRIBUTING.md.
+linters:
+  default: standard
+  settings:
+    staticcheck:
+      # Style quickfixes (De Morgan, tagged switch), not defects.
+      checks: ["all", "-QF1001", "-QF1002"]
+    errcheck:
+      # Best effort by design: a deadline that fails to set, a response
+      # that the client already hung up on, a child we detach from.
+      exclude-functions:
+        - (net.Conn).SetDeadline
+        - (net.Conn).SetReadDeadline
+        - (net.Conn).SetWriteDeadline
+        - (net.Conn).Write
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - (*os.Process).Release
+  exclusions:
+    presets:
+      # Close, Remove, Fprint* and friends on cleanup paths: nothing to do
+      # with the error there.
+      - std-error-handling
+    rules:
+      # Tests drive the code under test and fail on its result; an unchecked
+      # setup call there is noise.
+      - path: _test\.go
+        linters: [errcheck]
+      # Deferred ref cleanup after a snapshot relay; a ref that is already
+      # gone is the success case.
+      - path: internal/snapshot/relay\.go
+        linters: [errcheck]
+        text: "`s\\.git`"
+      # Tests exercise hostile input on purpose, with invisible Unicode
+      # (U+202E, zero width) written literally so the case reads as it is.
+      - path: _test\.go
+        linters: [staticcheck]
+        text: ST1018

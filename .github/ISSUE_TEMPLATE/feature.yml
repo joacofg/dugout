@@ -1,0 +1,18 @@
+name: Feature request
+description: Something Dugout should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you or your agents run into today, and when.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: How Dugout could help. Alternatives you considered are welcome too.
+    validations:
+      required: true

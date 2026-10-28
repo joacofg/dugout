@@ -1,0 +1,12 @@
+{
+  "name": "dugout",
+  "version": "0.9.1",
+  "description": "Dugout: shared awareness between the team's agents. Warns of textual conflicts, with file and lines, before the merge.",
+  "author": {
+    "name": "Dugout",
+    "url": "https://github.com/joacofg/dugout"
+  },
+  "homepage": "https://github.com/joacofg/dugout",
+  "repository": "https://github.com/joacofg/dugout",
+  "license": "MIT"
+}

@@ -1,0 +1,30 @@
+services:
+  dugout:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["serve", "-addr", "0.0.0.0:7457", "-state", "/data/serve.json", "-allow-host", "${DUGOUT_HOST}", "-log-format", "json"]
+    volumes:
+      - dugout-data:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      # DUGOUT_BIND narrows it to one address of the host, e.g. its Tailscale IP.
+      - "${DUGOUT_BIND:-0.0.0.0}:443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DUGOUT_HOST: ${DUGOUT_HOST}
+    depends_on:
+      - dugout
+    restart: unless-stopped
+
+volumes:
+  dugout-data:
+  caddy-data:
+  caddy-config:

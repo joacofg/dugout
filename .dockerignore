@@ -1,0 +1,6 @@
+.git
+.claude
+plugin/bin
+deploy/.env
+docs
+deploy/certs

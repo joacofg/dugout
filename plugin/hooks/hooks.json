@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/dugout-run\" hook SessionStart", "timeout": 2 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/dugout-run\" hook UserPromptSubmit", "timeout": 2 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/dugout-run\" hook PreToolUse", "timeout": 2 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|SendMessage",
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/dugout-run\" hook PostToolUse", "timeout": 2 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/dugout-run\" hook Stop", "timeout": 2 }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/bin/dugout-run\" hook SessionEnd", "timeout": 2 }
+        ]
+      }
+    ]
+  }
+}

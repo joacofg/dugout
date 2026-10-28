@@ -1,0 +1,18 @@
+.claude/worktrees/
+plugin/bin/dugout
+deploy/.env
+deploy/certs/
+__pycache__/
+/dugout
+# Internal material: design notes, research, plans, agent notes and design
+# artifacts stay out of this repo (see CONTRIBUTING.md). CI enforces it.
+docs/designs/
+docs/research/
+docs/handoffs/
+docs/plans/
+notes/
+/PRODUCT.md
+/DESIGN.md
+.impeccable/
+CLAUDE.local.md
+.claude/settings.local.json

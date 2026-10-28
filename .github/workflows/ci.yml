@@ -1,0 +1,115 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to a commit; Dependabot (see ../dependabot.yml) moves the
+# pins and keeps the version comment next to them.
+#
+# Go 1.27.x on purpose, not the 1.26 that go.mod allows: govulncheck flags
+# standard-library vulnerabilities that only newer patch releases fix
+# (net/http, crypto/tls), and the binaries we ship are built with this toolchain.
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - name: git version
+        run: git --version
+      - name: vet
+        run: go vet ./...
+      - name: test (race)
+        run: go test -race ./...
+      - name: simulation seeds
+        run: DUGOUT_SIM_SEEDS=1000 go test ./internal/sim/ -run TestSimSeeds
+      # The macOS and Linux files compile in separate build-tag sets; a test
+      # run on one only compiles that set.
+      - name: cross-build
+        run: |
+          for os in darwin linux; do
+            for arch in amd64 arm64; do
+              CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -o /dev/null ./cmd/dugout
+            done
+          done
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          cache: true
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+
+  # What no Go test looks at: the plugin and the binary agree on the version,
+  # the JSON and shell the plugin ships parse, and the workflows are valid.
+  repo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.x'
+          cache: false
+      - name: binary and plugin versions agree
+        run: scripts/check-version.sh
+      - name: plugin json parses
+        run: |
+          for f in .claude-plugin/marketplace.json plugin/.claude-plugin/plugin.json plugin/hooks/hooks.json plugin/.mcp.json; do
+            jq empty "$f" || { echo "$f is not valid JSON"; exit 1; }
+          done
+      - name: shell scripts parse
+        run: |
+          for f in plugin/bin/dugout-run install.sh scripts/*.sh docs/demo.sh; do
+            bash -n "$f" || { echo "$f does not parse"; exit 1; }
+          done
+      - name: actionlint
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      # Warnings fail too: unknown fields and missing metadata that Claude Code
+      # tolerates at run time but a marketplace listing does not.
+      - name: claude plugin validate
+        run: |
+          npm install -g @anthropic-ai/claude-code@2.1.308
+          claude plugin validate --strict .
+          claude plugin validate --strict ./plugin
+
+  # Only what users and contributors need is tracked: a path allowlist and a
+  # denylist of hashed terms (scripts/check-public-tree.sh).
+  public-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: public tree
+        run: scripts/check-public-tree.sh

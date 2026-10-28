@@ -1,0 +1,11 @@
+# The certificate comes from outside Caddy: `tailscale cert` for a tailnet
+# host (see docs/self-hosting.md) or your organization's, at these two
+# paths in deploy/certs. Not `tls internal`: every laptop would have to trust
+# Caddy's root CA for every domain, with its key on this host.
+{$DUGOUT_HOST} {
+	reverse_proxy dugout:7457 {
+		# SSE: do not buffer, events must reach the daemon as they happen.
+		flush_interval -1
+	}
+	tls /certs/dugout.crt /certs/dugout.key
+}

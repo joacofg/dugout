@@ -1,0 +1,14 @@
+{
+  "name": "dugout",
+  "owner": {
+    "name": "Dugout"
+  },
+  "description": "The Dugout plugin for Claude Code.",
+  "plugins": [
+    {
+      "name": "dugout",
+      "source": "./plugin",
+      "description": "Shared awareness between the team's agents: warns of textual conflicts, with file and lines, before the merge."
+    }
+  ]
+}
