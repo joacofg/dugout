@@ -28,7 +28,8 @@ func isWebPath(p string) bool {
 	return c == p && (c == "/office" || strings.HasPrefix(c, "/office/")) || p == "/office/"
 }
 
-// webHandler serves the page's files, index.html at /office and /office/.
+// webHandler serves the page's files: index.html at /office and /office/,
+// pixel.html at /office/pixel.
 func webHandler() http.Handler {
 	files, err := fs.Sub(webFS, "web")
 	if err != nil {
@@ -44,6 +45,10 @@ func webHandler() http.Handler {
 		name := strings.TrimPrefix(r.URL.Path, "/office")
 		if name == "" || name == "/" || name == "/index.html" {
 			http.ServeFileFS(w, r, files, "index.html")
+			return
+		}
+		if name == "/pixel" {
+			http.ServeFileFS(w, r, files, "pixel.html")
 			return
 		}
 		r2 := r.Clone(r.Context())

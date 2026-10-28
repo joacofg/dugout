@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"io"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -11,7 +12,7 @@ import (
 // a token, under a CSP that keeps every resource on serve's own origin.
 func TestOfficePageNeedsNoToken(t *testing.T) {
 	_, srv, _ := stateServer(t, repoApp)
-	for _, p := range []string{"/office", "/office/", "/office/app.js", "/office/app.css"} {
+	for _, p := range []string{"/office", "/office/", "/office/app.js", "/office/app.css", "/office/pixel", "/office/pixel.css"} {
 		req, _ := http.NewRequest(http.MethodGet, srv.URL+p, nil)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -30,6 +31,32 @@ func TestOfficePageNeedsNoToken(t *testing.T) {
 		}
 		if resp.Header.Get("X-Content-Type-Options") != "nosniff" || resp.Header.Get("Referrer-Policy") != "no-referrer" {
 			t.Errorf("GET %s: headers %v", p, resp.Header)
+		}
+	}
+}
+
+// TestOfficePixelPage: the pixel office is another page of the same files,
+// at /office/pixel, under the same headers, loading the shared client.
+func TestOfficePixelPage(t *testing.T) {
+	_, srv, _ := stateServer(t, repoApp)
+	for _, p := range []string{"/office/pixel"} {
+		resp, err := http.Get(srv.URL + p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+			t.Errorf("GET %s: status %d, type %q, want 200 text/html", p, resp.StatusCode, resp.Header.Get("Content-Type"))
+			continue
+		}
+		if csp := resp.Header.Get("Content-Security-Policy"); csp != webCSP {
+			t.Errorf("GET %s: CSP %q, want the page CSP", p, csp)
+		}
+		for _, want := range []string{`<canvas id="floor"`, `/office/client.js`, `/office/pixel-art.js`, `/office/pixel.js`, `href="/office"`} {
+			if !strings.Contains(string(b), want) {
+				t.Errorf("GET %s: page lacks %q", p, want)
+			}
 		}
 	}
 }
@@ -77,9 +104,11 @@ func TestOfficePageNoForms(t *testing.T) {
 // TestOfficeAssetsGetOnly: the page's routes take nothing but GET.
 func TestOfficeAssetsGetOnly(t *testing.T) {
 	_, srv, _ := stateServer(t, repoApp)
-	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
-		if code, _ := as(t, srv, "").do(m, "/office/app.js", "application/json", []byte("{}")); code != http.StatusMethodNotAllowed {
-			t.Errorf("%s /office/app.js: status %d, want 405", m, code)
+	for _, p := range []string{"/office/app.js", "/office/pixel"} {
+		for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+			if code, _ := as(t, srv, "").do(m, p, "application/json", []byte("{}")); code != http.StatusMethodNotAllowed {
+				t.Errorf("%s %s: status %d, want 405", m, p, code)
+			}
 		}
 	}
 }
