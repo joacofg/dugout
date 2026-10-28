@@ -33,7 +33,9 @@
   let reduced = motion.matches;
 
   let view = null, repo = null, repoName = "", chosen = office.repoParam();
-  let stale = false, failed = false;
+  // cut is set while the stream is down, so the first view after it is drawn
+  // as it is, without replaying what happened in between.
+  let stale = false, failed = false, cut = false;
   let desks = new Map(), looks = new Map(), focusedDesk = "";
   // toned holds until when each changed desk's label keeps its tone, so a
   // view that follows soon after does not wipe it.
@@ -106,7 +108,11 @@
   // meta line wraps on a narrow desk), then moves the labels with them.
   function fit() {
     const tags = [...scene.querySelectorAll(".tag")];
+    // A focused or hovered label shows its whole intent; the room is sized
+    // for the clamped one, so measure every label clamped.
+    scene.classList.add("measuring");
     const tallest = Math.max(0, ...tags.map((t) => t.offsetHeight));
+    scene.classList.remove("measuring");
     const need = DESKH + Math.ceil(tallest / grid.s) + 2;
     if (need <= grid.cellH) return;
     place(need);
@@ -222,13 +228,15 @@
   function say(text) {
     $("announce").textContent = text;
   }
+  // announce says the view's most pressing change in one sentence: an
+  // escalation, else a message, else a new intent.
   function announce(d) {
-    const out = [];
-    if (d.messages.length === 1) out.push(branchOf(d.messages[0].from) + " messaged " + branchOf(d.messages[0].to));
-    else if (d.messages.length > 1) out.push(d.messages.length + " messages between agents");
-    for (const id of d.intents) { const w = byID(id); out.push(personOf(id) + " on " + w.branch + ": " + (w.intent || "no intent")); }
-    for (const e of d.escalations) out.push("Escalation: waiting for a human on " + e.paths.join(", "));
-    if (out.length) say(out.join(". "));
+    const e = d.escalations[0], ids = [...d.intents];
+    if (e) say("Escalation: waiting for a human on " + e.paths.join(", "));
+    else if (d.messages.length === 1) say(branchOf(d.messages[0].from) + " messaged " + branchOf(d.messages[0].to));
+    else if (d.messages.length > 1) say(d.messages.length + " messages between agents");
+    else if (ids.length === 1) say(personOf(ids[0]) + " on " + branchOf(ids[0]) + ": " + (byID(ids[0]).intent || "no intent"));
+    else if (ids.length > 1) say(ids.length + " agents declared a new intent");
   }
 
   // ---- the repo shown ----------------------------------------------------------------
@@ -248,7 +256,8 @@
     if (failed) return;
     view = v;
     const name = office.pickRepo(v, chosen);
-    const prev = name && name === repoName ? repo : null;
+    const prev = name && name === repoName && !cut ? repo : null;
+    cut = false;
     repoName = name;
     repo = v.repos.find((r) => r.repo === name) || EMPTY;
     nav(v);
@@ -360,7 +369,9 @@
     for (const [id, since] of bulbs) {
       const d = desks.get(id);
       if (!d || now - since > BULB_MS) { bulbs.delete(id); continue; }
-      art.bulb(g, d.cx - 2, d.top - 5, reduced || Math.floor((now - since) / 300) % 2 === 0, P);
+      // Beside the head, inside the desk's own cell: above it sits the label
+      // of the desk in the row before.
+      art.bulb(g, d.cx - 15, d.top + 5, reduced || Math.floor((now - since) / 300) % 2 === 0, P);
     }
     st.present();
     frames++;
@@ -387,6 +398,10 @@
   function redraw() {
     if (!repo) return;
     if (moving()) {
+      // Resizing the canvas for a view clears it: paint now, before the
+      // browser shows an empty floor, and let the loop carry on.
+      draw(performance.now());
+      lastFrame = performance.now();
       if (!looping) { looping = true; requestAnimationFrame(tick); }
       return;
     }
@@ -427,6 +442,7 @@
     lastState = state;
     const was = stale;
     stale = state === "stale";
+    if (state !== "live") cut = true;
     if (was !== stale) redraw();
   }
   function fail(title, line) {

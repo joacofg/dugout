@@ -128,6 +128,12 @@ h2 { font-size: var(--fs-section); font-weight: 500; margin: 0; }
   .row { grid-template-columns: minmax(0, 1fr); min-height: 44px; }
   .sechead { flex-wrap: wrap; }
   .repos a, .pick select { min-height: 44px; }
+  .pick select { max-width: 34vw; }
+  .pick .word { display: none; }
+  /* The status gives way first on a narrow bar: it ellipsizes, never pushes. */
+  .status { min-width: 0; }
+  #status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .top { gap: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .row, .item { transition: none; }

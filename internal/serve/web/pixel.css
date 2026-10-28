@@ -70,6 +70,8 @@ h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; over
 .tag .intent { font-size: var(--fs-intent); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
 .tag:hover .intent, .tag:focus .intent { display: block; }
 .tag:hover .who, .tag:hover .branch, .tag:focus .who, .tag:focus .branch { white-space: normal; }
+.scene.measuring .tag .intent { display: -webkit-box; }
+.scene.measuring .tag .who, .scene.measuring .tag .branch { white-space: nowrap; }
 .tag .meta { font-size: var(--fs-meta); color: var(--muted); margin-top: 2px; }
 .tag .muted { color: var(--muted); }
 /* A step darker than the clear view's positive: it sits on the floor-tinted
@@ -89,7 +91,11 @@ h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; over
 @media (max-width: 767px) {
   .top { padding: 0 16px; gap: 10px; font-size: 14px; }
   .crumb { display: none; }
-  .pick select { min-height: 44px; }
+  .pick select { min-height: 44px; max-width: 34vw; }
+  .pick .word { display: none; }
+  /* The status gives way first on a narrow bar: it ellipsizes, never pushes. */
+  .status { min-width: 0; }
+  #status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .view { display: inline-flex; align-items: center; min-height: 44px; }
   .sheet { margin: 0; border-radius: 0; border-width: 1px 0 0; padding: 16px; }
   /* On a phone the sign leaves the wall for the top of the scene, where its
