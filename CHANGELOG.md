@@ -4,6 +4,10 @@ All notable changes to Dugout are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- The pixel office: the office view as a live pixel-art scene for demos, at `/office/pixel` or with `dugout office -pixel`, on the same read-only data and view token.
+
 ## [0.9.1] - 2026-10-28
 
 The first public release.

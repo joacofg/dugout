@@ -78,7 +78,7 @@ Work as usual, one worktree per task. Dugout only makes itself noticed when it n
 - **The intent:** at the start, Dugout asks the agent to declare in one sentence what it is going to do (the `office_declare_intent` tool). Your prompt is never sent. Everyone with a token for the repo can see that sentence and your files in flight, and it reaches the agents of whoever touches the same files.
 - **Every new warning** shows you one line, for example `Dugout: api.go conflicts with branch "ana/login"`.
 - **`dugout status`** shows your workstreams, their intent, the conflicts and overlaps, the pause, the agent metrics and whether there is a connection to the server.
-- **`dugout office`** opens the read-only office view of your team's server in the browser.
+- **`dugout office`** opens the read-only office view of your team's server in the browser; `dugout office -pixel` opens it as a pixel-art scene for demos.
 - **`dugout pause` and `dugout resume`** stop Dugout on your machine: the hooks inject nothing and hold no edits, and the daemon keeps watching. The admin can also pause the whole team.
 
 ### What leaves your machine
