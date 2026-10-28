@@ -65,3 +65,33 @@ func TestOfficeNoServer(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q; want 2 and missing -server", code, errb)
 	}
 }
+
+// TestOfficePixelURL: -pixel opens the pixel office with the same view token.
+func TestOfficePixelURL(t *testing.T) {
+	srv := httptest.NewServer(serve.New().Handler())
+	t.Cleanup(srv.Close)
+	t.Setenv(wire.EnvToken, "dgt_test")
+	out, errb, code := office(t, "-server", srv.URL, "-no-open", "-pixel")
+	if code != 0 || !strings.Contains(out, srv.URL+"/office/pixel#t="+wire.ViewTokenPrefix) {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want the pixel office's URL with a view token", code, out, errb)
+	}
+}
+
+// TestOfficePixelOldServer: a serve with the office view but no pixel office
+// says so instead of opening a page that is not there.
+func TestOfficePixelOldServer(t *testing.T) {
+	real := serve.New().Handler()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/office/pixel" {
+			http.NotFound(w, r)
+			return
+		}
+		real.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv(wire.EnvToken, "dgt_test")
+	out, errb, code := office(t, "-server", srv.URL, "-no-open", "-pixel")
+	if code != 1 || !strings.Contains(errb, "older than the pixel office") || out != "" {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 1 and the old-server message", code, out, errb)
+	}
+}
