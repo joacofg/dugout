@@ -4,6 +4,8 @@ All notable changes to Dugout are recorded here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-28
+
 The first public release.
 
 ### Added
@@ -20,4 +22,5 @@ The first public release.
 - One-line install (`install.sh`, checked against `SHA256SUMS`), `dugout setup` and `setup --remove`, and team invites (`dugout admin invite`, `dugout join`).
 - macOS (launchd, Keychain) and Linux (systemd, Secret Service or a 0600 file).
 
-[Unreleased]: https://github.com/joacofg/dugout/commits/main
+[Unreleased]: https://github.com/joacofg/dugout/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/joacofg/dugout/releases/tag/v0.9.1
