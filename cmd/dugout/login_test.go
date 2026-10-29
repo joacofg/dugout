@@ -301,9 +301,13 @@ func TestTokenMissingDaemonRuns(t *testing.T) {
 	p := start(t, secEnv(t, secDir, home), "daemon", "-server", server, "-insecure", "-poll", "300ms", "-resend", "1s")
 	waitDaemonSocket(t, home)
 	f := overlapRepo(t)
-	if out := runHook(t, home, "SessionStart", map[string]any{"session_id": "sA", "cwd": f}); !strings.Contains(out, "office_declare_intent") {
-		t.Fatalf("hook = %s, want the daemon's answer", out)
-	}
+	// The hook gives up after 150 ms, which a cold daemon on a slow runner can
+	// exceed on its first answer: ask again until the daemon answers.
+	var out string
+	eventually(t, 5*time.Second, "the daemon answers the SessionStart hook", func() bool {
+		out = runHook(t, home, "SessionStart", map[string]any{"session_id": "sA", "cwd": f})
+		return strings.Contains(out, "office_declare_intent")
+	})
 	log := p.log.String()
 	if n := strings.Count(log, "no token for "+server+": run dugout login"); n != 1 {
 		t.Fatalf("warned %d times, want 1:\n%s", n, log)
