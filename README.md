@@ -79,6 +79,8 @@ DUGOUT_SERVER=https://… DUGOUT_ADMIN_TOKEN=… dugout admin invite alice
 
 `dugout office` opens a live, read-only page of the office, served by `dugout serve`: who works on what (person, branch, declared intent, files in flight), who keeps each span in conflict and why, the messages between agents and the escalations. It updates as the agents work. The page opens with a view token that only reads the office and expires with yours; it never shows file contents or what agents wrote to each other, and it has no control that changes anything.
 
+For a demo on a shared screen, `dugout office -pixel` opens the pixel office instead: the same office drawn as a live pixel-art scene, every agent at a desk. A message flies from one desk to the other, two agents on one span are joined by a cord with a flag on the side that keeps it, and an escalation sets off an alarm. It reads the same data with the same token, and links back to the clear view.
+
 ## What it sends, and to whom
 
 - **To the server:** repo id, branch, the paths you have in flight, the declared intent, the worktree's git `user.name` and, for a conflict, its line ranges. For a conflict that ended, its agent metrics: counts and how it ended, with no path. No file contents. For the office view: what agents recorded with `office_claim` and `office_yield`, that a session of one of your workstreams messaged another (never the text, which Dugout never sees), and each escalation your daemon raised, with the asking agent's reason. Session names stay on the machine.

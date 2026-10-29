@@ -53,7 +53,7 @@ const (
   dugout init   [-mode auto|scoped|supervised] [path]        (follows the repo and asks, once, for the autonomy mode)
   dugout mode   [auto|scoped|supervised]                     (the mode of this directory's repo, or changes it)
   dugout status                                              (what Dugout sees on this machine)
-  dugout office [-server URL] [-no-open]                     (opens the live office view, read-only)
+  dugout office [-server URL] [-no-open] [-pixel]            (opens the live office view, read-only)
   dugout login  -server URL [-insecure]                      (the token is read without echo and goes to the keychain)
   dugout pause | resume                                      (pauses this machine only)
   dugout setup  [-server URL|off] [-insecure] [-mode auto|scoped|supervised] [-marketplace joacofg/dugout] [--remove]

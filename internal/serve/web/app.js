@@ -1,39 +1,20 @@
-// The office view: a read-only client of serve's office stream
-// (GET /v1/office/stream), whose events each carry the whole view as
-// GET /v1/office answers it. It never sends anything but those GETs, and it
-// sets every text from the daemons as text, never as markup.
+// The office view: it draws the views client.js reads from serve's office
+// stream, and sets every text from the daemons as text, never as markup.
 "use strict";
 
 (() => {
-  const TOKEN_KEY = "dugout.office.token";
   const TINTS = ["#dfe9f7", "#f6e3d3", "#dcefdc", "#f5dde3", "#d6efea", "#e8f0d2"];
   const MAX_MESSAGES = 12;
   const MAX_LANES = 6;
   const CHANGE_MS = 2000;
 
-  // ---- token and repo, from the address --------------------------------
+  // ---- the repo, from the address ----------------------------------------
 
-  function storage() {
-    try { return window.sessionStorage; } catch (e) { return null; }
-  }
-  function takeToken() {
-    const m = /(?:^#|&)t=([^&]+)/.exec(location.hash);
-    const st = storage();
-    if (m) {
-      try { st && st.setItem(TOKEN_KEY, decodeURIComponent(m[1])); } catch (e) { /* the token stays in memory only */ }
-      history.replaceState(null, "", location.pathname + location.search);
-      return decodeURIComponent(m[1]);
-    }
-    try { return (st && st.getItem(TOKEN_KEY)) || ""; } catch (e) { return ""; }
-  }
-  const token = takeToken();
-  let chosenRepo = new URLSearchParams(location.search).get("repo") || "";
+  let chosenRepo = DugoutOffice.repoParam();
 
   function setRepo(repo) {
     chosenRepo = repo;
-    const q = new URLSearchParams(location.search);
-    q.set("repo", repo);
-    history.replaceState(null, "", location.pathname + "?" + q.toString());
+    DugoutOffice.setRepoParam(repo);
     selected = "";
     if (view) render(view, false);
     document.getElementById("main").focus();
@@ -70,9 +51,7 @@
   // ---- time -------------------------------------------------------------
 
   let serverSkew = 0; // serve's clock minus ours, from each view's "at"
-  function clock(iso) {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  }
+  const clock = DugoutOffice.clock;
   function ago(iso) {
     const m = Math.round((Date.now() + serverSkew - Date.parse(iso)) / 60000);
     return m <= 0 ? "now" : m === 1 ? "1 min ago" : m < 60 ? m + " min ago" : "at " + clock(iso);
@@ -133,13 +112,7 @@
   let seen = null; // signatures of what the last render showed, by key
   const announced = new Set();
 
-  function pickRepo(v) {
-    const names = v.repos.map((r) => r.repo);
-    if (chosenRepo && names.includes(chosenRepo)) return chosenRepo;
-    const open = v.repos.find((r) => r.escalations.some((e) => e.open));
-    if (open) return open.repo;
-    return [...v.repos].sort((a, b) => b.workstreams.length - a.workstreams.length)[0]?.repo || "";
-  }
+  const pickRepo = (v) => DugoutOffice.pickRepo(v, chosenRepo);
 
   function renderNav(v, current) {
     const list = document.getElementById("repos");
@@ -168,6 +141,7 @@
     const pickerFocused = active === document.getElementById("repo-select");
     const current = pickRepo(v);
     renderNav(v, current);
+    document.getElementById("to-pixel").href = "/office/pixel" + (current ? "?repo=" + encodeURIComponent(current) : "");
     if (focusedRepo) {
       const link = [...document.querySelectorAll("#repos a")].find((a) => a.dataset.repo === focusedRepo);
       if (link) link.focus({ preventScroll: true });
@@ -393,64 +367,6 @@
     document.getElementById("main").replaceChildren(stateBlock(title, line));
   }
 
-  let delay = 1000;
-  async function connect() {
-    let resp;
-    try {
-      resp = await fetch("/v1/office/stream", { headers: token ? { Authorization: "Bearer " + token } : {}, cache: "no-store" });
-    } catch (e) {
-      return retry();
-    }
-    if (resp.status === 401) {
-      return token
-        ? fail("This view's token expired or was revoked.", "Run dugout office to open it again.")
-        : fail("This view needs a token.", "Run dugout office to open it.");
-    }
-    if (resp.status === 404) {
-      return fail("This server is older than the office view.", "Update dugout serve.");
-    }
-    if (!resp.ok || !resp.body) return retry();
-    delay = 1000;
-    const reader = resp.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let cut;
-        while ((cut = buf.indexOf("\n\n")) >= 0) {
-          event(buf.slice(0, cut));
-          buf = buf.slice(cut + 2);
-        }
-      }
-    } catch (e) { /* the stream broke: retry below */ }
-    retry();
-  }
-  function event(block) {
-    let name = "", data = "";
-    for (const line of block.split("\n")) {
-      if (line.startsWith("event: ")) name = line.slice(7);
-      else if (line.startsWith("data: ")) data += line.slice(6);
-    }
-    if (name !== "office" || !data) return;
-    let v;
-    try { v = JSON.parse(data); } catch (e) { return; }
-    serverSkew = Date.parse(v.at) - Date.now();
-    const live = view !== null;
-    // A view the page cannot draw must not tear down a healthy stream: keep
-    // the last one drawn and wait for the next event.
-    try { render(v, live); } catch (e) { console.error("office view: could not draw this update", e); return; }
-    setStatus("live", "Live · " + clock(v.at) + " · Read-only");
-  }
-  function retry() {
-    if (view) setStatus("stale", "Reconnecting · last update " + clock(view.at));
-    else setStatus("down", "Connecting");
-    setTimeout(connect, delay);
-    delay = Math.min(delay * 2, 30000);
-  }
-
   // Relative times move on, and the links follow the layout.
   setInterval(() => { if (view) for (const t of document.querySelectorAll("time")) if (!/^\d\d:\d\d$/.test(t.textContent)) t.textContent = ago(t.getAttribute("datetime")); }, 30000);
   let resizeTimer = 0;
@@ -460,5 +376,12 @@
   });
   if (document.fonts) document.fonts.ready.then(() => { if (view) render(view, false); });
 
-  connect();
+  DugoutOffice.connect({
+    onView(v) {
+      serverSkew = Date.parse(v.at) - Date.now();
+      render(v, view !== null);
+    },
+    onStatus: setStatus,
+    onFail: fail,
+  });
 })();

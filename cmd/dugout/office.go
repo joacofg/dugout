@@ -32,13 +32,15 @@ func defaultOpenURL(u string) error {
 }
 
 // cmdOffice is `dugout office`: it asks serve for a read-only view token as
-// this person and opens the live office view with it. The server is -server,
-// else $DUGOUT_SERVER, else the running daemon's.
+// this person and opens the live office view with it, or with -pixel the
+// pixel office. The server is -server, else $DUGOUT_SERVER, else the running
+// daemon's.
 func cmdOffice(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("office", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	server := flags.String("server", os.Getenv(envServer), "URL of dugout serve (or $"+envServer+", else the daemon's)")
 	noOpen := flags.Bool("no-open", false, "print the URL without opening a browser")
+	pixel := flags.Bool("pixel", false, "open the pixel office instead of the clear view")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
 		return 2
 	}
@@ -89,7 +91,15 @@ func cmdOffice(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "dugout office: unexpected answer from the server")
 		return 1
 	}
-	u := base + "/office#t=" + vt.Token
+	page := "/office"
+	if *pixel {
+		page = "/office/pixel"
+		if !hasPage(ctx, base+page) {
+			fmt.Fprintln(stderr, "dugout office: this server is older than the pixel office: update dugout serve")
+			return 1
+		}
+	}
+	u := base + page + "#t=" + vt.Token
 	fmt.Fprintf(stdout, "%s\nRead-only, valid until %s.\n", u, vt.Expires.Local().Format("15:04 on Jan 2"))
 	if !*noOpen {
 		if err := openURL(u); err != nil {
@@ -97,6 +107,21 @@ func cmdOffice(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return 0
+}
+
+// hasPage reports whether serve has the page at u. A page needs no token,
+// and any answer but 404 means it is there or the browser will say why.
+func hasPage(ctx context.Context, u string) bool {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return true
+	}
+	resp.Body.Close()
+	return resp.StatusCode != http.StatusNotFound
 }
 
 // daemonServer is the running daemon's server, "" when there is no daemon or

@@ -6,7 +6,9 @@
 <meta name="referrer" content="no-referrer">
 <title>Office · Dugout</title>
 <link rel="preload" href="/office/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/office/fonts.css">
 <link rel="stylesheet" href="/office/app.css">
+<script src="/office/client.js" defer></script>
 <script src="/office/app.js" defer></script>
 </head>
 <body>
@@ -20,8 +22,9 @@
   </aside>
   <header class="top">
     <span class="crumb">Office / <b id="crumb-repo"></b></span>
-    <label class="pick">Repo <select id="repo-select"></select></label>
+    <label class="pick"><span class="word">Repo</span> <select id="repo-select"></select></label>
     <span class="status" id="status" data-state="connecting"><span class="dot" aria-hidden="true"></span><span id="status-text">Connecting</span></span>
+    <a class="view" id="to-pixel" href="/office/pixel">Pixel view</a>
   </header>
   <main class="sheet" id="main" tabindex="-1">
     <div class="state"><h1>Connecting</h1></div>

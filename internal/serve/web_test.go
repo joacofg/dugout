@@ -1,8 +1,11 @@
 package serve
 
 import (
+	"io"
 	"io/fs"
 	"net/http"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -11,7 +14,7 @@ import (
 // a token, under a CSP that keeps every resource on serve's own origin.
 func TestOfficePageNeedsNoToken(t *testing.T) {
 	_, srv, _ := stateServer(t, repoApp)
-	for _, p := range []string{"/office", "/office/", "/office/app.js", "/office/app.css"} {
+	for _, p := range []string{"/office", "/office/", "/office/app.js", "/office/app.css", "/office/pixel", "/office/pixel.css"} {
 		req, _ := http.NewRequest(http.MethodGet, srv.URL+p, nil)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -77,9 +80,11 @@ func TestOfficePageNoForms(t *testing.T) {
 // TestOfficeAssetsGetOnly: the page's routes take nothing but GET.
 func TestOfficeAssetsGetOnly(t *testing.T) {
 	_, srv, _ := stateServer(t, repoApp)
-	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
-		if code, _ := as(t, srv, "").do(m, "/office/app.js", "application/json", []byte("{}")); code != http.StatusMethodNotAllowed {
-			t.Errorf("%s /office/app.js: status %d, want 405", m, code)
+	for _, p := range []string{"/office/app.js", "/office/pixel"} {
+		for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+			if code, _ := as(t, srv, "").do(m, p, "application/json", []byte("{}")); code != http.StatusMethodNotAllowed {
+				t.Errorf("%s %s: status %d, want 405", m, p, code)
+			}
 		}
 	}
 }
@@ -113,6 +118,78 @@ func TestOfficeFontsSameOrigin(t *testing.T) {
 		code, _ := as(t, srv, anaTok).do(http.MethodGet, c.path, "", nil, "Origin", c.origin)
 		if code != c.want {
 			t.Errorf("GET %s with Origin %s: status %d, want %d", c.path, c.origin, code, c.want)
+		}
+	}
+}
+
+// pageRefs is what a served page asks the browser to load: script and
+// stylesheet URLs in document order, and its anchors.
+type pageRefs struct{ scripts, styles, links []string }
+
+var tagRe = regexp.MustCompile(`<(script|link|a)\s[^>]*>`)
+var attrRe = regexp.MustCompile(`\b(src|href|rel)="([^"]*)"`)
+
+func getPage(t *testing.T, base, path string) (pageRefs, *http.Response) {
+	t.Helper()
+	resp, err := http.Get(base + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		t.Fatalf("GET %s: status %d, type %q, want 200 text/html", path, resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	var refs pageRefs
+	for _, m := range tagRe.FindAllStringSubmatch(string(b), -1) {
+		attrs := map[string]string{}
+		for _, a := range attrRe.FindAllStringSubmatch(m[0], -1) {
+			attrs[a[1]] = a[2]
+		}
+		switch {
+		case m[1] == "script":
+			refs.scripts = append(refs.scripts, attrs["src"])
+		case m[1] == "link" && attrs["rel"] == "stylesheet":
+			refs.styles = append(refs.styles, attrs["href"])
+		case m[1] == "a":
+			refs.links = append(refs.links, attrs["href"])
+		}
+	}
+	return refs, resp
+}
+
+// TestOfficeViewsServeTheirParts: each view is served under the page CSP,
+// loads only same-origin scripts from /office/ with the shared client first,
+// links to the other view, and every script and stylesheet it names answers.
+func TestOfficeViewsServeTheirParts(t *testing.T) {
+	_, srv, _ := stateServer(t, repoApp)
+	for _, c := range []struct{ path, own, other string }{
+		{"/office", "/office/app.js", "/office/pixel"},
+		{"/office/pixel", "/office/pixel.js", "/office"},
+	} {
+		refs, resp := getPage(t, srv.URL, c.path)
+		if csp := resp.Header.Get("Content-Security-Policy"); csp != webCSP {
+			t.Errorf("GET %s: CSP %q, want the page CSP", c.path, csp)
+		}
+		if len(refs.scripts) == 0 || refs.scripts[0] != "/office/client.js" || refs.scripts[len(refs.scripts)-1] != c.own {
+			t.Errorf("GET %s: scripts %v, want client.js first and %s last", c.path, refs.scripts, c.own)
+		}
+		if !slices.Contains(refs.links, c.other) {
+			t.Errorf("GET %s: links %v, want one to %s", c.path, refs.links, c.other)
+		}
+		for _, u := range append(append([]string{}, refs.scripts...), refs.styles...) {
+			if !strings.HasPrefix(u, "/office/") {
+				t.Errorf("GET %s: loads %q, want a same-origin /office/ file", c.path, u)
+				continue
+			}
+			r, err := http.Get(srv.URL + u)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Body.Close()
+			if r.StatusCode != http.StatusOK || r.Header.Get("Content-Security-Policy") != webCSP {
+				t.Errorf("GET %s (from %s): status %d, CSP %q, want 200 under the page CSP", u, c.path, r.StatusCode, r.Header.Get("Content-Security-Policy"))
+			}
 		}
 	}
 }

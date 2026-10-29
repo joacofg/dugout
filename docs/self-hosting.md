@@ -117,7 +117,7 @@ If someone says a warning did not reach them, ask for their `dugout doctor --bun
 
 ## The office view
 
-`serve` also serves a live, read-only page of the office. Each person opens it with `dugout office`, which asks the server for a view token that only reads the office and dies with their own token, after 12 hours or when the server restarts. The page shows only the repos that person can see.
+`serve` also serves a live, read-only page of the office. Each person opens it with `dugout office`, which asks the server for a view token that only reads the office and dies with their own token, after 12 hours or when the server restarts. The page shows only the repos that person can see. `dugout office -pixel` opens the same office as a pixel-art scene for demos, at `/office/pixel`, with the same token and the same limits.
 
 ## Update
 
