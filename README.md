@@ -17,9 +17,18 @@ Everyone runs their own Claude Code, in their own worktrees, on their own machin
 curl -fsSL https://raw.githubusercontent.com/joacofg/dugout/main/install.sh | sh
 ```
 
-It downloads the release binary for your machine, checks it against the release's `SHA256SUMS`, installs the daemon as a service, adds the Claude Code plugin, tracks the repo you are in and ends with `dugout doctor`. Restart Claude Code (or run `/reload-plugins`) and work as usual, one worktree per task.
+It downloads the release binary for your machine, checks it against the release's `SHA256SUMS`, installs the daemon as a service, adds the Claude Code plugin, tracks the repo you are in and ends with `dugout doctor`.
 
 Requirements: macOS, or Linux with systemd; [Claude Code](https://claude.com/claude-code); a git whose `merge-tree --write-tree` takes a merge base (tested with 2.50.1). Without an SSH key for GitHub, set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` before installing. Building from source, installing by hand, updating and uninstalling: [docs/install.md](docs/install.md).
+
+## Two minutes to a working install
+
+1. **Run the install line** in the repo you work in. `dugout setup` installs the daemon as a service, adds the Claude Code plugin, tracks this repo and ends with `dugout doctor`.
+2. **Restart Claude Code** (or run `/reload-plugins` in it) to load the plugin.
+3. **Check it works:** `dugout doctor` lists what is missing, and every line with `✗` says how to fix it. `dugout status` shows your workstreams and whether the daemon answers.
+4. **Work as usual, one worktree per task.** Nothing changes until it must: when another branch has one of your files in flight, or a speculative merge of the two really fails, you see one line, for example `Dugout: api.go conflicts with branch "feat-login"`.
+
+To see the warning for yourself, run two Claude Code sessions in parallel, each in its own worktree of the same repo, and have both change the same file — alone on one machine is enough ([details below](#try-it-alone-on-one-machine)).
 
 ## What it does, in 30 seconds
 
