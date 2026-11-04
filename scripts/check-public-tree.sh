@@ -36,6 +36,7 @@ ALLOW=(
   scripts/check-version.sh scripts/check-public-tree.sh scripts/public-denylist.sha256
   scripts/smoke-claude.sh scripts/smoke-mcp.sh scripts/solo.sh
   docs/install.md docs/self-hosting.md docs/configuration.md docs/demo.tape docs/demo.sh docs/demo.gif
+  docs/social-preview.png docs/logo.svg
 )
 
 files=()
